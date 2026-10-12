@@ -40,10 +40,14 @@ main{flex:1;overflow-y:auto;padding:4px 16px 40px;-webkit-overflow-scrolling:tou
 .rbar{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:#ffcf6e;flex-wrap:wrap}
 .rbar button{font-size:22px;padding:10px 14px;border-radius:16px;background:#fff;box-shadow:0 3px 0 #c9902f;font-weight:bold;color:#5a3a1a}
 .rbar .title{flex:1;font-size:20px;font-weight:bold;min-width:120px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#sfxTog.on{background:#b980f0;color:#fff}
 #voiceTog.on{background:#3aa0ff;color:#fff}
 #readBtn{background:#2ec46b;color:#fff}
 #page{flex:1;padding:24px 6vw;overflow-y:auto;line-height:1.6;font-size:var(--fs,30px);touch-action:pan-y}
 #page p{margin:0 0 .7em}
+#page .pic{display:block;margin:0 auto .6em;max-width:100%;max-height:min(38vh,420px);width:auto;height:auto;border-radius:16px;box-shadow:0 4px 0 #0002;object-fit:contain}
+#page svg.pic{width:min(100%,560px);height:auto;max-height:34vh}
+@media (orientation:portrait){#page .pic{max-height:32vh}}
 #page .w{border-radius:8px;padding:0 2px}
 #page .w.hl{background:#ffe03a;box-shadow:0 0 0 3px #ffe03a}
 .rfoot{display:flex;align-items:center;justify-content:space-between;padding:8px 16px calc(env(safe-area-inset-bottom) + 10px)}
@@ -73,7 +77,7 @@ main{flex:1;overflow-y:auto;padding:4px 16px 40px;-webkit-overflow-scrolling:tou
 <div id="reader">
  <div class="rbar"><button id="back">🏠</button><div class="title" id="rtitle"></div>
   <button id="voiceTog">🔊 Voice</button><button id="readBtn">▶️ READ TO ME</button>
-  <button id="chBtn">📑 Chapters</button><button id="aMinus">A−</button><button id="aPlus">A+</button><button id="rfav">🤍</button></div>
+  <button id="chBtn">📑 Chapters</button><button id="sfxTog">🔈 Sounds ON</button><button id="aMinus">A−</button><button id="aPlus">A+</button><button id="rfav">🤍</button></div>
  <div id="page"></div>
  <div class="rfoot"><button id="prev">◀</button><div id="pnum"></div><button id="next">▶</button></div>
 </div>
@@ -132,17 +136,39 @@ $('#q').oninput=render;
 $('#tabs').querySelectorAll('button').forEach(x=>x.onclick=()=>{tab=x.dataset.t;$('#tabs').querySelectorAll('button').forEach(y=>y.classList.toggle('on',y===x));render()});
 // reader
 let book,ci=0,pages=[],pi=0,speaking=false,utt=null;
-function paginate(){const budget=Math.round(560*(30/fs)**2*Math.max(.6,Math.min(1.8,innerWidth*innerHeight/(1024*768))));
+function paginate(){const budget=Math.round(420*(30/fs)**2*Math.max(.6,Math.min(1.8,innerWidth*innerHeight/(1024*768))));
  pages=[];let cur=[],n=0;
  const chunks=[];book.chapters[ci].text.forEach(p=>{if(p.length<=budget)chunks.push([p,1]);else{const S=p.match(/[^.!?]+[.!?”"’']*\s*/g)||[p];let c='';S.forEach(s=>{if((c+s).length>budget&&c){chunks.push([c.trim(),0]);c=''}c+=s});chunks.push([c.trim(),1])}});
  chunks.forEach(([c])=>{if(n+c.length>budget&&cur.length){pages.push(cur);cur=[];n=0}cur.push(c);n+=c.length+15});if(cur.length)pages.push(cur)}
+function scene(b,k){const S=b.scenes&&b.scenes.length?b.scenes:[b.emoji];const e=[...new Intl.Segmenter().segment(S[k%S.length])].map(x=>x.segment);const night=b.cat==='Bedtime'||/🌙|🕯️/.test(S[k%S.length]);const h=hash(b.id+k);
+ const sky=night?['#1d2b64','#5a4fcf']:[['#7ec8ff','#d6f1ff'],['#ffb36b','#ffe9b0'],['#9be7ff','#e3fff6']][h%3];
+ const xs=e.length==1?[280]:e.length==2?[190,370]:e.length==3?[140,280,420]:[110,220,340,450];
+ return `<svg class="pic" viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="s${h}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs><rect width="560" height="300" rx="24" fill="url(#s${h})"/>
+ ${night?[...Array(12)].map((_,i)=>`<circle cx="${(h*(i+3)*37)%560}" cy="${(h*(i+7)*13)%140}" r="2.5" fill="#fff"/>`).join('')+'<circle cx="480" cy="60" r="30" fill="#fff6c2"/><circle cx="494" cy="52" r="28" fill="'+sky[0]+'"/>':'<circle cx="480" cy="62" r="34" fill="#ffe03a"/><ellipse cx="120" cy="60" rx="50" ry="18" fill="#fff" opacity=".9"/><ellipse cx="300" cy="40" rx="40" ry="14" fill="#fff" opacity=".8"/>'}
+ <path d="M0 220 Q140 170 280 215 T560 205 V300 H0Z" fill="${night?'#2f6b3a':'#6bcb77'}"/><path d="M0 250 Q200 225 360 255 T560 245 V300 H0Z" fill="${night?'#245a2f':'#4caf50'}"/>
+ ${e.map((x,i)=>`<text x="${xs[i]}" y="${i==0?235:228+((h>>i)&1)*14}" font-size="${i==0?110:86}" text-anchor="middle">${x}</text>`).join('')}</svg>`}
+function picFor(){const ch=book.chapters[ci],im=ch.img||[],P=pages.length;
+ if(im.length){const per=Math.max(1,Math.min(3,Math.floor(P/im.length)||1));if(pi%per===0){const k=Math.floor(pi/per);if(k<im.length)return `<img class="pic" loading="lazy" src="${im[k]}" alt="">`}
+  if(pi>=im.length*per&&pi%3===0)return `<img class="pic" loading="lazy" src="${im[(pi/3|0)%im.length]}" alt="">`;return ''}
+ return pi%3===0?scene(book,ci*7+pi/3):''}
+function fitPic(){const pg=$('#page'),pic=pg.querySelector('.pic');if(!pic)return;pic.style.maxHeight='';const extra=pg.scrollHeight-pg.clientHeight;if(extra>2){const h=pic.getBoundingClientRect().height-extra-4;if(h<90)pic.style.display='none';else pic.style.maxHeight=h+'px'}}
 function savePos(){pos[book.id]={c:ci,p:pi};LS.set('pos',pos)}
 function showPage(){stopSpeak();pi=Math.max(0,Math.min(pi,pages.length-1));savePos();let off=0;const ch=book.chapters[ci],multi=book.chapters.length>1;
- $('#page').innerHTML=(multi&&pi==0?`<h2 style="margin:0 0 .5em;color:#e8562a">Chapter ${ci+1}: ${esc(ch.t)}</h2>`:'')+pages[pi].map(p=>'<p>'+p.split(/(\s+)/).map(w=>{const s=off;off+=w.length;return /\S/.test(w)?`<span class="w" data-s="${s}">${esc(w)}</span>`:w}).join('')+'</p>'+(off++,'')).join('');
- $('#pnum').textContent=(multi?`Ch ${ci+1}/${book.chapters.length} · `:'')+`Page ${pi+1} of ${pages.length}`;const last=ci==book.chapters.length-1&&pi==pages.length-1;$('#prev').disabled=pi==0&&ci==0;$('#next').textContent=last?'🏁':'▶';
+ $('#page').innerHTML=(multi&&pi==0?`<h2 style="margin:0 0 .5em;color:#e8562a">Chapter ${ci+1}: ${esc(ch.t)}</h2>`:'')+picFor()+pages[pi].map(p=>'<p>'+p.split(/(\s+)/).map(w=>{const s=off;off+=w.length;return /\S/.test(w)?`<span class="w" data-s="${s}">${esc(w)}</span>`:w}).join('')+'</p>'+(off++,'')).join('');
+ fitPic();$('#page').querySelectorAll('img.pic').forEach(i=>i.onload=fitPic);$('#pnum').textContent=(multi?`Ch ${ci+1}/${book.chapters.length} · `:'')+`Page ${pi+1} of ${pages.length}`;const last=ci==book.chapters.length-1&&pi==pages.length-1;$('#prev').disabled=pi==0&&ci==0;$('#next').textContent=last?'🏁':'▶';
  $('#page').querySelectorAll('.w').forEach(w=>w.onclick=e=>{e.stopPropagation();if(!voice)return;stopSpeak();say(w.textContent.replace(/[^\w’'-]/g,''),.8);w.classList.add('hl');setTimeout(()=>w.classList.remove('hl'),700)});
  if(voice&&autoRead)setTimeout(readPage,350)}
 let autoRead=false;
+let AC=null,sfx=LS.get('sfx',true);
+function ac(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==='suspended')AC.resume();return AC}
+['touchstart','pointerdown','keydown'].forEach(ev=>addEventListener(ev,function u(){const a=ac();if(a){const b=a.createBuffer(1,1,22050),s=a.createBufferSource();s.buffer=b;s.connect(a.destination);s.start(0)}removeEventListener(ev,u,true)},true));
+function flip(){if(!sfx)return;const a=ac();if(!a)return;const t=a.currentTime,d=.32,n=Math.floor(a.sampleRate*d),buf=a.createBuffer(1,n,a.sampleRate),x=buf.getChannelData(0);
+ for(let i=0;i<n;i++){const p=i/n;x[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*Math.min(1,p*1.15)),1.6)*(1+.5*Math.sin(p*40))}
+ const s=a.createBufferSource();s.buffer=buf;const bp=a.createBiquadFilter();bp.type='bandpass';bp.Q.value=.9;bp.frequency.setValueAtTime(700,t);bp.frequency.exponentialRampToValueAtTime(4200,t+d*.55);bp.frequency.exponentialRampToValueAtTime(1500,t+d);
+ const hp=a.createBiquadFilter();hp.type='highpass';hp.frequency.value=300;const g=a.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.35,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+d);
+ s.connect(bp);bp.connect(hp);hp.connect(g);g.connect(a.destination);s.start(t)}
+function chime(){if(!sfx)return;const a=ac();if(!a)return;const t=a.currentTime;[523.25,659.25,783.99].forEach((f,i)=>{const o=a.createOscillator(),g=a.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t+i*.09);g.gain.linearRampToValueAtTime(.12,t+i*.09+.02);g.gain.exponentialRampToValueAtTime(.001,t+i*.09+.7);o.connect(g);g.connect(a.destination);o.start(t+i*.09);o.stop(t+i*.09+.8)})}
+function setSfx(v){sfx=v;LS.set('sfx',v);$('#sfxTog').textContent=v?'🔈 Sounds ON':'🔇 Sounds OFF';$('#sfxTog').classList.toggle('on',v)}
 function voicePick(){const V=speechSynthesis.getVoices().filter(v=>/^en/i.test(v.lang));return V.find(v=>/Samantha|Karen|Moira|Google US|Female/i.test(v.name))||V[0]}
 function say(t,rate=.85,onb,onend){const u=new SpeechSynthesisUtterance(t);u.rate=rate;u.pitch=1.1;const v=voicePick();if(v)u.voice=v;u.onboundary=onb;u.onend=onend;speechSynthesis.speak(u);return u}
 function stopSpeak(){speaking=false;try{speechSynthesis.cancel()}catch(e){}$('#readBtn').textContent='▶️ READ TO ME';document.querySelectorAll('.w.hl').forEach(x=>x.classList.remove('hl'))}
@@ -150,10 +176,10 @@ function readPage(){if(!('speechSynthesis' in window))return;stopSpeak();speakin
  const txt=pages[pi].join(' ');const W=[...$('#page').querySelectorAll('.w')];
  utt=say(txt,.85,e=>{if(e.name&&e.name!=='word')return;W.forEach(x=>x.classList.remove('hl'));let k=W.findLastIndex(x=>+x.dataset.s<=e.charIndex);if(k>=0)W[k].classList.add('hl')},()=>{if(!speaking)return;speaking=false;W.forEach(x=>x.classList.remove('hl'));$('#readBtn').textContent='▶️ READ TO ME';nextPage()})}
 function setVoice(v){voice=v;LS.set('voice',v);$('#voiceTog').textContent=v?'🔊 Voice ON':'🔇 Voice OFF';$('#voiceTog').classList.toggle('on',v);$('#readBtn').style.display=v?'':'none';if(!v){autoRead=false;stopSpeak()}}
-function nextPage(){if(pi<pages.length-1){pi++;showPage()}else if(ci<book.chapters.length-1){ci++;pi=0;paginate();showPage()}else finish()}
-function prevPage(){if(pi>0){pi--;showPage()}else if(ci>0){ci--;paginate();pi=pages.length-1;showPage()}}
-function goCh(c){ci=c;pi=0;paginate();showPage()}
-function openBook(id){book=BOOKS.find(b=>b.id===id);const sp=pos[id];ci=sp?Math.min(sp.c,book.chapters.length-1):0;pi=sp?sp.p:0;$('#chBtn').style.display=book.chapters.length>1?'':'none';autoRead=false;$('#rtitle').textContent=book.emoji+' '+book.title;$('#rfav').textContent=favs.includes(id)?'❤️':'🤍';
+function nextPage(){if(pi<pages.length-1){flip();pi++;showPage()}else if(ci<book.chapters.length-1){flip();ci++;pi=0;paginate();showPage()}else finish()}
+function prevPage(){if(pi>0){flip();pi--;showPage()}else if(ci>0){flip();ci--;paginate();pi=pages.length-1;showPage()}}
+function goCh(c){flip();ci=c;pi=0;paginate();showPage()}
+function openBook(id){chime();setSfx(sfx);book=BOOKS.find(b=>b.id===id);const sp=pos[id];ci=sp?Math.min(sp.c,book.chapters.length-1):0;pi=sp?sp.p:0;$('#chBtn').style.display=book.chapters.length>1?'':'none';autoRead=false;$('#rtitle').textContent=book.emoji+' '+book.title;$('#rfav').textContent=favs.includes(id)?'❤️':'🤍';
  $('#page').style.setProperty('--fs',fs+'px');paginate();$('#page').style.setProperty('--fs',fs+'px');$('#reader').classList.add('show');setVoice(!!voice);showPage();
  $('#vtitle').textContent=book.emoji+' '+book.title;$('#chooseVoice').classList.toggle('last',voice===true);$('#chooseSelf').classList.toggle('last',voice===false);$('#vmodal').classList.add('show')}
 $('#chooseVoice').onclick=()=>{$('#vmodal').classList.remove('show');setVoice(true);readPage()};
@@ -162,6 +188,7 @@ $('#voiceTog').onclick=()=>{setVoice(!voice);if(voice)readPage()};
 $('#readBtn').onclick=()=>speaking?(autoRead=false,stopSpeak()):readPage();
 $('#back').onclick=()=>{stopSpeak();$('#reader').classList.remove('show');render()};
 $('#prev').onclick=prevPage;
+$('#sfxTog').onclick=()=>{setSfx(!sfx);if(sfx)flip()};
 $('#next').onclick=nextPage;
 $('#chBtn').onclick=()=>{$('#clist').innerHTML=book.chapters.map((c,i)=>`<button data-i="${i}" class="${i==ci?'on':''}">${i+1}. ${esc(c.t)}</button>`).join('');$('#clist').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('#cmodal').classList.remove('show');goCh(+b.dataset.i)});$('#cmodal').classList.add('show')};
 $('#cclose').onclick=()=>$('#cmodal').classList.remove('show');
